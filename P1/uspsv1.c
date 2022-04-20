@@ -91,7 +91,7 @@ int main(int argc, char* argv[]){
 
 	int status;
 	for(int i = 0; i < nprograms; i++){
-		wait(NULL);	
+		wait(&status);	
 	}
 	
 
