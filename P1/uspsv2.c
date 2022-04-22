@@ -2,11 +2,19 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <signal.h>
 #include "p1fxns.h"
 #include <sys/wait.h>
 #include <sys/types.h>
 
+int usr1_handled = 0;
 
+static void sigusr1_handler(int signal){
+	if(signal == SIGUSR1){
+		usr1_handled = 1;
+	}
+
+}
 
 void free_args(char **args, int arg_count){
 	if(args != NULL){
@@ -20,6 +28,11 @@ void free_args(char **args, int arg_count){
 }
 
 int main(int argc, char* argv[]){
+	
+	if(signal(SIGUSR1, sigusr1_handler) == SIG_ERR){
+		exit(1);
+	}
+	int *pidarr = NULL;
 
 	int file = 0;
 	char *filename = NULL;
@@ -65,6 +78,13 @@ int main(int argc, char* argv[]){
 		if(buf[linelength - 1] == '\n'){
 			buf[linelength - 1] = '\0';
 		}
+
+		if(pidarr == NULL){
+			pidarr = (int *) malloc(sizeof(int));
+		}
+		else{
+			pidarr = (int *) realloc(pidarr, nprograms * sizeof(int));
+		}
 		
 		char **args;
 		char tmp[64];
@@ -92,12 +112,19 @@ int main(int argc, char* argv[]){
 		
 		//Start fork process
 		int pid = fork();
+		if(pid > 0){
+			printf("OG PID: %d\n", pid);
+			pidarr[nprograms - 1] = pid;
+		}
 		if(pid < 0){
 			p1perror(2, "FORK FAILED\n");
 			free_args(args, arg_count);
 			exit(1);
 		}
 		if(pid == 0){
+			while(!usr1_handled){
+				sleep(1);
+			}
 			execvp(args[0], args);
 		}
 
@@ -105,9 +132,21 @@ int main(int argc, char* argv[]){
 	
 	}
 	
-	int status;
 	for(int i = 0; i < nprograms; i++){
-		wait(&status);
+		kill(pidarr[i], SIGUSR1);
+	}
+
+	for(int i = 0; i < nprograms; i++){
+		kill(pidarr[i], SIGSTOP);
+	}
+
+	for(int i = 0; i < nprograms; i++){
+		kill(pidarr[i], SIGCONT);
+	}
+	
+	for(int i = 0; i < nprograms; i++){
+		printf("pidarr[%d] = %d\n", i, pidarr[i]);
+		wait(&pidarr[i]);
 	}
 
 }
