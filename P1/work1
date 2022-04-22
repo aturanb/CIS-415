@@ -1,3 +1,4 @@
-./cpubound -n 1 -m 1
+sleep 10
+ls
 ./cpubound -n 1 -m 1
 cat test
