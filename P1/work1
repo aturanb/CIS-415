@@ -1,4 +1,4 @@
-sleep 10
-ls
+./iobound -n 1 -m 1
 ./cpubound -n 1 -m 1
-cat test
+./iobound -n 1 -m 1
+./cpubound -n 1 -m 1

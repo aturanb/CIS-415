@@ -1,6 +1,6 @@
 CFLAGS=-W -Wall -I/usr/local/include
 LDFLAGS=-L/usr/local/lib
-PROGS=uspsv1 cpubound
+PROGS=uspsv1 cpubound iobound
 
 all: $(PROGS)
 
