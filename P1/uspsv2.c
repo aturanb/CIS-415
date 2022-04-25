@@ -7,11 +7,11 @@
 #include <sys/wait.h>
 #include <sys/types.h>
 
-int usr1_handled = 0;
+volatile int usr1_handled = 0;
 
 static void sigusr1_handler(int signal){
 	if(signal == SIGUSR1){
-		usr1_handled = 1;
+		usr1_handled++;
 	}
 
 }
@@ -123,7 +123,7 @@ int main(int argc, char* argv[]){
 		}
 		if(pid == 0){
 			while(!usr1_handled){
-				sleep(1);
+				pause();
 			}
 			execvp(args[0], args);
 		}
@@ -144,9 +144,10 @@ int main(int argc, char* argv[]){
 		kill(pidarr[i], SIGCONT);
 	}
 	
+	int status;
 	for(int i = 0; i < nprograms; i++){
 		printf("pidarr[%d] = %d\n", i, pidarr[i]);
-		wait(&pidarr[i]);
+		wait(&status);
 	}
 
 }
