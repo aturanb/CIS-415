@@ -38,6 +38,7 @@ PCB *current;
 
 const Queue *proc_queue; 
 
+char header[] = "PID VmSize VmRSS Shared Trs Lrs Drs Dt\n";
 static int pid2index(pid_t pid) {
 	int i;
 	for(i = 0; i < num_procs; ++i) {
@@ -69,7 +70,49 @@ static void chld_handler(UNUSED int sig) {
 	}
 }
 
+static void printproc(pid_t pid){
+	//Turn pid to char pid
+	char pid_c[12];
+	p1itoa(pid, pid_c);
+	
+	//Paths	
+	char dir[5120] = "/proc/";
+	char status[] = "/statm";
+	
+	char procstate[1000];
+	char word[200];
+	char state[512];
+	char name[512];
+	char bufo[1000];
+	
+
+	p1strcat(dir, pid_c);
+	p1strcat(dir, status);
+
+	int file = open(dir, O_RDONLY);
+	//rite(1, pid_c, p1strlen(pid_c));
+
+       		
+	
+	int i = 0;
+	int n = 0;
+
+	while((i = p1getline(file, bufo, 1000)) != 0){
+		
+			write(1, bufo, 1000);
+	
+		
+		n++;
+
+		//write(1, " ", p1strlen(" "));
+		//write(1, buf, BUFSIZ);
+	}
+		
+
+}
+
 static void alrm_handler(UNUSED int sig) {
+    
 	if(current != NULL){
 		if(current->isalive == true){
 			current->ticks = current->ticks - 1;
@@ -77,6 +120,9 @@ static void alrm_handler(UNUSED int sig) {
 				return;
 			}
 			kill(current->pid, SIGSTOP);
+			   
+			
+			printproc(current->pid);
 			proc_queue->enqueue(proc_queue, ADT_VALUE(current));
 		}
 		current = NULL;
@@ -110,7 +156,7 @@ void free_args(char **args, int arg_count){
 }
 
 int main(int argc, char* argv[]){
-
+	   
 	//Set input to stdin, if file specified it will get overwritten later
 	int file = 0;
 
@@ -186,7 +232,7 @@ int main(int argc, char* argv[]){
 	signal(SIGALRM, alrm_handler);
 	
 	parent = getpid();
-
+	
 	char buf[BUFSIZ];
 	int linelength;
 	struct itimerval interval;
@@ -221,6 +267,7 @@ int main(int argc, char* argv[]){
 			arg++;
 		}
 		args[arg_count] = NULL;
+		
 		
 		//Start fork process
 		PCB *curr_proc = pcb_arr+num_procs;
