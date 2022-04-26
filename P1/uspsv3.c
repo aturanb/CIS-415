@@ -1,3 +1,10 @@
+/*
+ * AUTHOR : AHMET TURAN BULUT
+ * LOGIN : aturanb
+ * TITLE: CIS 415 P1
+ * This is my own work except help hours and lab codes
+*/
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
@@ -141,7 +148,7 @@ int main(int argc, char* argv[]){
 
 	//Check if quantum is a valid number
 	if(q_int < MIN_Q || q_int > MAX_Q) {
-		printf("Unreasonable quantum\n");
+		p1perror(2, "Unreasonable quantum\n");
 		return 1;
 	}
 
@@ -158,7 +165,7 @@ int main(int argc, char* argv[]){
 		} 
 	}
 
-	/*
+	
 	//Initialize signals
 	if(signal(SIGUSR1, usr1_handler) == SIG_ERR){
 		p1perror(2, "SIGUSR1: could not initialize signal\n");
@@ -179,11 +186,6 @@ int main(int argc, char* argv[]){
 		p1perror(2, "SIGALRM: could not initialize signal\n");
 		return 1;
 	}
-	*/
-	signal(SIGUSR1, usr1_handler);
-	signal(SIGUSR2, usr2_handler);
-	signal(SIGCHLD, chld_handler);
-	signal(SIGALRM, alrm_handler);
 	
 	parent = getpid();
 
@@ -224,28 +226,7 @@ int main(int argc, char* argv[]){
 		
 		//Start fork process
 		PCB *curr_proc = pcb_arr+num_procs;
-		/*pid_t pid = fork();
-		//If parent process
-		if(pid > 0){
-			curr_proc->pid = pid;
-			curr_proc->isalive = true;
-			curr_proc->usr1 = true;
-			proc_queue->enqueue(proc_queue, ADT_VALUE(curr_proc));
-		}
-		//Failed to fork
-		if(pid < 0){
-			p1perror(2, "FORK FAILED\n");
-			goto cleanup;
-			return 1;
-		}
-		//Child process
-		if(pid == 0){
-			while(!usr1){
-				pause();
-			}
-			execvp(args[0], args);
-			break;
-		}*/
+	
 		pid_t pid;
 		switch(pid=fork()) {
 			case -1:

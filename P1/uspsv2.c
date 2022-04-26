@@ -1,3 +1,10 @@
+/*
+ * AUTHOR : AHMET TURAN BULUT
+ * LOGIN : aturanb
+ * TITLE: CIS 415 P1
+ * This is my own work except help hours and lab codes
+*/
+
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -113,7 +120,6 @@ int main(int argc, char* argv[]){
 		//Start fork process
 		int pid = fork();
 		if(pid > 0){
-			printf("OG PID: %d\n", pid);
 			pidarr[nprograms - 1] = pid;
 		}
 		if(pid < 0){
@@ -146,8 +152,8 @@ int main(int argc, char* argv[]){
 	
 	int status;
 	for(int i = 0; i < nprograms; i++){
-		printf("pidarr[%d] = %d\n", i, pidarr[i]);
 		wait(&status);
 	}
 
+	close(file);
 }

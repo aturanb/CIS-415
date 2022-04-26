@@ -1,0 +1,27 @@
+Name: Ahmet Turan Bulut
+DuckID: turanb
+Assistance: NIck's and Timmy's help hours
+
+State of the solution: 	
+
+--USPSV1:
+-works as intended
+-no memory leaks
+-no errors
+
+--USPSV2:
+-works as intended
+-does not terminate when ran with valgrind
+-no errors
+
+--USPSV3:
+-works as intended
+-no memory leaks
+-no errors
+
+--USPSV4:
+-works as intended, but not pretty
+-no memory leaks
+-valgrind reports system_call error because of a write() in printproc()
+(
+Did not have enought time to fix the problens due to the family emergency that I stated in the email)
