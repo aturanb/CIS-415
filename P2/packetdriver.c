@@ -23,7 +23,7 @@ NetworkDevice *networkDevice;
 
 void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_length, FreePacketDescriptorStore **fpds_ptr){
 	/* create Free Packet Descriptor Store using mem_start and mem_length */
-	*fpds = FreePacketDescriptorStore_create(mem_start, mem_length);
+	*fpd_store = FreePacketDescriptorStore_create(mem_start, mem_length);
 	//FIXME; 
 	
 	/* create any buffers required by your thread[s] */
@@ -39,7 +39,8 @@ void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_le
 	pthread_create(&receiverT, NULL, send, NULL);
 
 	/* return the FPDS to the code that called you */
-
+	*fpd_store = (FreePacketDescriptorStore *)fpds;
+	
 }
 
 void blocking_send_packet(PacketDescriptor *pd) {
