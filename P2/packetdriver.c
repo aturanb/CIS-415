@@ -14,16 +14,18 @@
 
 #include "packetdriver.h"
 
+#define TRY 15
+
 BoundedBufer *buf_pool;
 BoundedBufer *buf_receive [MAX_PID + 1];
 BoundedBufer *buf_send;
 
-FreePacketDescriptorStore *fpd_store;
+FreePacketDescriptorStore *fpds;
 NetworkDevice *networkDevice;
 
 void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_length, FreePacketDescriptorStore **fpds_ptr){
 	/* create Free Packet Descriptor Store using mem_start and mem_length */
-	*fpd_store = FreePacketDescriptorStore_create(mem_start, mem_length);
+	*fpds_ptr = FreePacketDescriptorStore_create(mem_start, mem_length);
 	//FIXME; 
 	
 	/* create any buffers required by your thread[s] */
@@ -36,10 +38,13 @@ void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_le
 	/* create any threads you require for your implementation */
 	pthread_t senderT, receiverT;
 	pthread_create(&senderT, NULL, send, NULL);
-	pthread_create(&receiverT, NULL, send, NULL);
+	pthread_create(&receiverT, NULL, receive, NULL);
 
 	/* return the FPDS to the code that called you */
-	*fpd_store = (FreePacketDescriptorStore *)fpds;
+	networkDevice = nd;
+	*fpds = (FreePacketDescriptorStore *) fpds_ptr;
+
+
 	
 }
 
@@ -72,17 +77,25 @@ static void *send(){
 	PacketDescriptor *pd = NULL;
 	int i;
 	while(1){
-		// Get PD
+		//Get Packet Descriptor from send buffer
 		pd = blockingRead(buf_send);
-		//try bufferadd(PD)
+		//try sending the packet descriptor to Network Device
 		for(i = 0; i < TRY; i++){
-			//Network->add(newPD)
 			if(sendPacket(networkDevice, pd)){
+				DIAGNOSTICS("PACKETDRIVER: Packet Sent\n");
 				break;
 			}
-			//pool->add(newPD)
+			else if(i == (TRY - 1)){
+				DIAGNOSTICS("Packet Send Failed\n");
+			}
+
+
 
 		}
+		//Reset the descriptor before sending to the pool
+		initPD(pd);
+		//Send it to pool
+		nonblockingWrite(buffer_pool, pd);
 			
 		
 
