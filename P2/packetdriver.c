@@ -70,14 +70,20 @@ int nonblocking_get_packet(PacketDescriptor **pd, PID pid) {
 
 static void *send(){
 	PacketDescriptor *pd = NULL;
+	int i;
 	while(1){
 		// Get PD
-		//	info
+		pd = blockingRead(buf_send);
 		//try bufferadd(PD)
-			//pool->getnew PD
-			//Fill Info
+		for(i = 0; i < TRY; i++){
 			//Network->add(newPD)
+			if(sendPacket(networkDevice, pd)){
+				break;
+			}
 			//pool->add(newPD)
+
+		}
+			
 		
 
 	}
