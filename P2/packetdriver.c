@@ -28,7 +28,7 @@ static void *receive();
 
 void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_length, FreePacketDescriptorStore **fpds_ptr){
 	/* create Free Packet Descriptor Store using mem_start and mem_length */
-	*fpds_ptr = FreePacketDescriptorStore_create(mem_start, mem_length);
+	fpds = FreePacketDescriptorStore_create(mem_start, mem_length);
 	
 	/* create any buffers required by your thread[s] */
 	buf_pool = BoundedBuffer_create(MAX_PID);
@@ -39,7 +39,8 @@ void init_packet_driver(NetworkDevice *nd, void *mem_start, unsigned long mem_le
 
 	/* return the FPDS to the code that called you */
 	networkDevice = nd;
-	fpds = (FreePacketDescriptorStore *) fpds_ptr;
+	*fpds_ptr = (FreePacketDescriptorStore *) fpds;
+	DIAGNOSTICS("SIZE OF FPDS: %ld\n", fpds->size(fpds));
 	
 	/* create any threads you require for your implementation */
 	pthread_t senderT, receiverT;
@@ -68,14 +69,14 @@ int nonblocking_send_packet(PacketDescriptor *pd) {
 void blocking_get_packet(PacketDescriptor **pd, PID pid) {
 	/* wait until there is a packet for `pid’ */
 	/* return that packet descriptor to the calling application */
-	buf_receive[pid]->blockingRead(buf_receive[pid], &pd);
+	buf_receive[pid]->blockingRead(buf_receive[pid], (void **) pd);
 }
 
 int nonblocking_get_packet(PacketDescriptor **pd, PID pid) {
 	/* if there is currently a waiting packet for `pid’, return that packet */
 	/* to the calling application and return 1 for the value of the function */
 	/* otherwise, return 0 for the value of the function */
-	return buf_receive[pid]->nonblockingRead(buf_receive[pid], (void **)&pd);
+	return buf_receive[pid]->nonblockingRead(buf_receive[pid], (void **) pd);
 }
 
 //Sends a packet descriptor to network
@@ -85,7 +86,7 @@ static void *send(){
 	while(1){
 		
 		//Get Packet Descriptor from send buffer
-		buf_send->blockingRead(buf_send, &pd);
+		buf_send->blockingRead(buf_send, (void **) &pd);
 		
 		//try sending the packet descriptor to Network Device
 		for(i = 0; i < TRY; i++){
@@ -94,7 +95,7 @@ static void *send(){
 				break;
 			}
 			else if(i == (TRY - 1)){
-				DIAGNOSTICS("Packet Send Failed\n");
+				DIAGNOSTICS("PACKETDRIVER: Packet Send Failed\n");
 			}
 
 
@@ -103,8 +104,8 @@ static void *send(){
 		
 		//Send it to pool 
 		if(!buf_pool->nonblockingWrite(buf_pool, pd)){
-			DIAGNOSTICS("Non Locking Put\n");
-			fpds->nonBlockingPut(fpds, pd);
+			DIAGNOSTICS("PACKETDRIVER: Non Blocking Write to Buffer Pool failed.\n Sending Packet Descriptor to Free Packet Descriptor Store\n");
+			fpds->nonblockingPut(fpds, pd);
 		}
 	}
 	return NULL;
@@ -117,17 +118,17 @@ static void *receive(){
 	PID pid;
 
 	//Get the free packet descriptor from fpds
-	blockingGet(fpds, &pd);
+	fpds->blockingGet(fpds, &pd);
 	
 	//Init the pd
 	initPD(pd);
 	
 	//Tell the network device to use the indicated PacketDescriptor for next incoming data packet
-	registerPD(networkDevice, pd);
+	networkDevice->registerPD(networkDevice, pd);
 
 	while(1){
 		//Block the thread until pd has been filled with an incoming data packet
-		awaitIncomingPacket(networkDevice);
+		networkDevice->awaitIncomingPacket(networkDevice);
 
 		//Get the PID of the application
 		pid = getPID(pd);
@@ -135,14 +136,14 @@ static void *receive(){
 		DIAGNOSTICS("PACKETDRIVER: Packet Received for PID: %d\n", pid);
 
 		//Write to buf_receive[pid];
-		blockingWrite(buf_receive[pid], pd);
+		buf_receive[pid]->blockingWrite(buf_receive[pid], pd);
 
 		
 		//Reset the PD with initPD
 		initPD(pd);
 		
 		//Return back to the store or pool???
-		blockingPut(fpds, pd);
+		fpds->blockingPut(fpds, pd);
 
 
 	}
