@@ -93,29 +93,19 @@ int main(int argc, char* argv[]){
 			pidarr = (int *) realloc(pidarr, nprograms * sizeof(int));
 		}
 		
-		char **args;
+		char *args[256];
 		char tmp[64];
 		int i = 0;
 		int arg_count = 0;
-
-		//Count the number of args
-		while((i = p1getword(buf, i, tmp)) != -1){	
-			arg_count++;
-		}
-
-		//Allocate memory for args 
-		args = (char **) malloc(sizeof(char *) * (arg_count + 1));
-		for(int i = 0; i < arg_count; i++){
-			args[i] = malloc(sizeof(char) * 24);
-		}
 		
 		//Fill in the **args
 		int arg = 0;
 		i = 0;
-		while((i = p1getword(buf, i, args[arg])) != -1){
+		while((i = p1getword(buf, i, tmp)) != -1){
+			args[arg] = p1strdup(tmp);
 			arg++;
 		}
-		args[arg_count] = NULL;
+		args[arg] = NULL;
 		
 		//Start fork process
 		int pid = fork();
@@ -129,13 +119,19 @@ int main(int argc, char* argv[]){
 		}
 		if(pid == 0){
 			while(!usr1_handled){
-				pause();
+				sleep(1);
 			}
 			execvp(args[0], args);
+			free(pidarr);
 		}
 
-		free_args(args, arg_count);
-	
+		//free_args(args, arg_count);
+		
+		for(int i = 0; i <= arg; i++){
+			free(args[i]);
+
+		}
+		
 	}
 	
 	for(int i = 0; i < nprograms; i++){

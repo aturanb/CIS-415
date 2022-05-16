@@ -46,6 +46,7 @@ PCB *current;
 const Queue *proc_queue; 
 
 char header[] = "PID VmSize VmRSS Shared Trs Lrs Drs Dt\n";
+
 static int pid2index(pid_t pid) {
 	int i;
 	for(i = 0; i < num_procs; ++i) {
@@ -102,7 +103,7 @@ static void printproc(pid_t pid){
 
 	while((i = p1getline(file, bufo, 1000)) != 0){
 
-		write(1, bufo, 1000);
+		write(1, bufo, p1strlen(bufo));
 	
 	}
 	close(file);

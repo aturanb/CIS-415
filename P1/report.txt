@@ -12,6 +12,7 @@ State of the solution:
 --USPSV2:
 -works as intended
 -does not terminate when ran with valgrind
+(Did not have enought time to fix this problem due to the family emergency that I stated in the email)
 -no errors
 
 --USPSV3:
@@ -22,6 +23,6 @@ State of the solution:
 --USPSV4:
 -works as intended, but not pretty
 -no memory leaks
--valgrind reports system_call error because of a write() in printproc()
-(
-Did not have enought time to fix the problens due to the family emergency that I stated in the email)
+-no errors
+
+
