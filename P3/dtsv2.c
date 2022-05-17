@@ -8,7 +8,7 @@
 
 #define PORT 19999
 #define SERVICE "DTS"
-#define USAGE "./dtsv1"
+#define USAGE "./dtsv2"
 
 void *recieve();
 
