@@ -12,6 +12,16 @@
 
 void *recieve();
 
+int extractWords(char *buf, char *sep, char *words[]) {
+    int i;
+    char *p;
+
+    for (p = strtok(buf, sep), i = 0; p != NULL; p = strtok(NULL, sep),i++)
+        words[i] = p;
+    words[i] = NULL;
+    return i;
+}
+
 int main(UNUSED int argc, UNUSED char *argv[]) {
     pthread_t reciever;
     pthread_create(&reciever, NULL, recieve, NULL);
@@ -29,12 +39,14 @@ void *recieve(){
     BXPService bxps;
     char *service;
     unsigned short port;
+    char *w[25];
+    int N;
 
     service = SERVICE;
     port = PORT;
     
     //Initialize BXP system - bind to ‘port’ if non-zero
-    assert(bxp_init(port, 0));
+    assert(bxp_init(port, 1));
     
     //Offer service named `service' in this process
     bxps = bxp_offer(service);
@@ -48,7 +60,22 @@ void *recieve(){
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
         query[len] = '\0';
-        sprintf(resp, "1%s", query);
+        N = extractWords(query, "|", w);
+        if(strcmp(w[0], "OneShot") == 0){
+            if(N == 7)
+                sprintf(resp, "1%s", query);
+        }
+        else if(strcmp(w[0], "Repeat") == 0){
+            if(N == 7)
+                sprintf(resp, "1%s", query);
+        }
+        else if(strcmp(w[0], "Cancel") == 0){
+            if(N == 2)
+                sprintf(resp, "1%s", query);
+        }
+        else{
+            sprintf(resp, "0%s", query);
+        }
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
     pthread_exit(NULL);
