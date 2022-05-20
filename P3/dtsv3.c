@@ -4,14 +4,59 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <pthread.h>
-#include "ADTs/prioqueue.h"
+#include <sys/time.h>
+#include "ADTs/heapprioqueue.h"
+#include "ADTs/queue.h"
+#include "ADTs/hashmap.h"
 #define UNUSED __attribute__((unused))
 
 #define PORT 19999
 #define SERVICE "DTS"
-#define USAGE "./dtsv2"
+#define USAGE "./dtsv3"
 
-void *recieve();
+const PrioQueue *q = NULL;
+const Map *map = NULL;
+
+int globid = 0;
+
+void *receive();
+
+typedef struct event {
+    int oneshot;
+    int repeat;
+    int cancelled;
+    unsigned long numRepeats;
+    unsigned long interval;
+    unsigned long id;
+    unsigned long clid;
+    unsigned int port;
+    char *host; 
+    char *service;
+} Event;
+
+int hash(void *key, int N){ 
+    return (((unsigned long)key)%N);
+}
+
+int compare(void *p1, void *p2){
+    struct timeval *s1 = (struct timeval *)p1;
+    struct timeval *s2 = (struct timeval *)p2;
+    int c;
+    if((s1->tv_sec) < (s2->tv_sec))
+        c = -1;
+    else if((s1->tv_sec) > (s2->tv_sec))
+        c = 1;
+    else{
+        if((s1->tv_usec) < (s2->tv_usec))
+            c = -1;
+        else if((s1->tv_usec) > (s2->tv_usec))
+            c = 1;
+        else
+            c = 0;
+    }
+    return c;
+
+}
 
 int extractWords(char *buf, char *sep, char *words[]) {
     int i;
@@ -24,19 +69,65 @@ int extractWords(char *buf, char *sep, char *words[]) {
 }
 
 int main(UNUSED int argc, UNUSED char *argv[]) {
-    pthread_t reciever;
-    pthread_create(&reciever, NULL, recieve, NULL);
-
-    pthread_join(reciever, NULL);
+    q = HeapPrioQueue(compare, doNothing, doNothing);
+    map = HashMap(100, 0.f, hash, compare, NULL, NULL);
+    
+    pthread_t receiver;
+    pthread_create(&receiver, NULL, receive, NULL);
+    pthread_join(receiver, NULL);
 
     return 0;
 }
 
-void *recieve(){
-    const PrioQueue *pq = PrioQueue_create(int (*cmp)(void*, void*),
-                                  void (*freePrio)(void *prio),
-                                  void (*freeValue)(void *value)
-                                 );
+int oneshot_insert(char *words[]){
+    Event *eve = (Event *)malloc(sizeof(Event));
+    struct timeval t = malloc(sizeof(struct timeval)); 
+    scanf(words[2], "%lu", &(t->tv_sec));
+    scanf(words[3], "%lu", &(t->tv_usec));
+    eve->oneshot = 1;
+    eve->repeat = 0;
+    eve->cancelled = 0;
+    eve->numRepeats = 0;
+    eve->id = globid;
+    scanf(words[1], "%lu", &(eve->clid));
+    scanf(words[6], "%u", &(eve->port));
+    scanf(words[4], "%lu", &(eve->host));
+    eve->host = strdup(words[4]); 
+    eve->service = strdup(words[5]);
+    //inset pq
+    q->pq_insert(q, timeval, (void *)eve);
+    //insert map
+    map->putUnique(map, (void *)id, (void *)eve);
+
+    globid++;  
+}
+
+int repeat_insert(char *words[]){
+    Event *eve = (Event *)malloc(sizeof(Event));
+    struct timeval t = malloc(sizeof(struct timeval));
+    //convert words[2](msecs) to sec and usec
+    scanf(//sec, "%lu", &(t->tv_sec));
+    scanf(//usec, "%lu", &(t->tv_usec)); 
+    
+    eve->oneshot = 0;
+    eve->repeat = 1;
+    eve->cancelled = 0;
+    scanf(words[3], "%lu", &(eve->numRepeats));
+    eve->id = globid;
+    scanf(words[1], "%lu", &(eve->clid));
+    scanf(words[6], "%u", &(eve->port));
+    scanf(words[4], "%lu", &(eve->host));
+    eve->host = strdup(words[4]); 
+    eve->service = strdup(words[5]);
+    //inset pq
+    q->pq_insert(q, timeval, (void *)eve);
+    //insert map
+    map->putUnique(map, (void *)id, (void *)eve);
+    globid++;  
+}
+
+void *receive(){
+    
     BXPEndpoint sender;
     char *query = (char *)malloc(BUFSIZ);
     char *resp = (char *)malloc(BUFSIZ);
@@ -84,4 +175,18 @@ void *recieve(){
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
     pthread_exit(NULL);
+}
+
+void *timer(void *args) {
+    unsigned long long counter = 0;
+    struct timeval now;
+
+    for(;;) {
+        usleep(USECS);
+        gettimeofday(&now, NULL);
+        counter++;
+        if((counter % 100) == 0)
+            printf("Another second has passed\n");
+        
+    }
 }
