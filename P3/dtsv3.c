@@ -22,6 +22,8 @@ const Map *map = NULL;
 
 int globid = 0;
 
+pthread_mutex_t lock;
+
 void *receive();
 void *timer(void *args);
 
@@ -206,6 +208,7 @@ void *receive(){
         if(strcmp(w[0], "OneShot") == 0 && N == 7){
                 oneshot_insert(w);
                 sprintf(resp, "1%s", query);
+                //TODO: sprintf(resp, "1%08lu", svid);
         }
         else if(strcmp(w[0], "Repeat") == 0 && N == 7){
                 repeat_insert(w);
@@ -240,6 +243,7 @@ void *timer(UNUSED void *args) {
 
         /* Get the events that are ready to harvest,
            Then add to queue */
+        pthread_mutex_lock(&lock);
         while(q->min(q, (void **)&tval_ptr, (void **)&eve_ptr)){
             //If now > tval_ptr, returns 1
             if(compare((void *)&now, (void *)&tval_ptr) == 1){
@@ -251,6 +255,8 @@ void *timer(UNUSED void *args) {
             else
                 break;
         }
+        pthread_mutex_unlock(&lock);
+        pthread_mutex_lock(&lock);
         /* Process the events that are in the queue */
         while(queue->dequeue(queue, (void **)&eve_ptr)){
             //If it is a repeat query, fire it
@@ -276,13 +282,17 @@ void *timer(UNUSED void *args) {
                 //free heap
             }
         }
+        pthread_mutex_unlock(&lock);
 
         /* Go through r_queue and insert the repeat events
            to the priority queue with a new priority */
+        pthread_mutex_lock(&lock);
         while(r_queue->dequeue(r_queue, (void **)&eve_ptr)){
             struct timeval *new_now;
             new_now = (struct timeval *)malloc(sizeof(struct timeval));
             q->insert(q, new_now, (void *)eve_ptr);
         }
+        pthread_mutex_unlock(&lock);
     }
+    pthread_exit(NULL);
 }
