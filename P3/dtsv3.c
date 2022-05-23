@@ -24,6 +24,7 @@ int globid = 0;
 
 pthread_mutex_t lock;
 
+
 void *receive();
 void *timer(void *args);
 
@@ -81,7 +82,7 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
     map = HashMap(100, 0.f, hash, compare, NULL, NULL);
     
     pthread_t receiver_t, timer_t;
-    
+    pthread_mutex_init(&lock, NULL);
     pthread_create(&receiver_t, NULL, receive, NULL);
     pthread_create(&timer_t, NULL, timer, NULL);
     
@@ -165,8 +166,12 @@ int repeat_insert(char *words[]){
     return status; 
 }
 
-int update_cancel(){
+int update_cancel(char *words[]){
     //TODO: Cancel a previous request
+    //svid = w[1]
+    //get from map
+    //cancel and resp = svid
+    //return resp
     int status = 1;
     Event *eve_ptr;
     map->get(map, (void *)&globid, (void *)&eve_ptr);
@@ -206,9 +211,9 @@ void *receive(){
         query[len] = '\0';
         N = extractWords(query, "|", w);
         if(strcmp(w[0], "OneShot") == 0 && N == 7){
-                oneshot_insert(w);
-                sprintf(resp, "1%s", query);
-                //TODO: sprintf(resp, "1%08lu", svid);
+                //id = oneshot_insert(w);
+                //sprintf(resp, "1%s", query);
+                sprintf(resp, "1%08lu", svid);
         }
         else if(strcmp(w[0], "Repeat") == 0 && N == 7){
                 repeat_insert(w);
@@ -219,10 +224,17 @@ void *receive(){
                 sprintf(resp, "1%s", query);
         }
         else{
+            //id = 0
             sprintf(resp, "0%s", query);
         }
+        //if id != 0
+        //sprintf(Resp)
+        //selse
+        //sprintf resp 0
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
+    free(query);
+    //resp
     pthread_exit(NULL);
 }
 
