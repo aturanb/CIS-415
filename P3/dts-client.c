@@ -115,12 +115,12 @@ int main(int argc, char *argv[]) {
     while (fgets(buf, sizeof(buf), stdin) != NULL) {
         char *w[25];
         char *sp = strrchr(buf, '\n');
-	int N;
-	if (sp != NULL)
+	    int N;
+	    if (sp != NULL)
             *sp = '\0';
-	id += 10;
-	N = extractWords(buf, " ", w);
-	if (strcmp(w[0], "OneShot") == 0) {
+	    id += 10;
+	    N = extractWords(buf, " ", w);
+	    if (strcmp(w[0], "OneShot") == 0) {
             long secs = 5L;
             gettimeofday(&tv, NULL);
 	    if (N > 1)

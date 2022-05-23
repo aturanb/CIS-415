@@ -92,10 +92,10 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
     return 0;
 }
 
-int oneshot_insert(char *words[]){
+unsigned long oneshot_insert(char *words[]){
     Event *eve = (Event *)malloc(sizeof(Event));
     struct timeval *t = (struct timeval *)malloc(sizeof(struct timeval)); 
-    int status = 1;
+
     //Initialize timeval
     scanf(words[2], "%lu", &(t->tv_sec));
     scanf(words[3], "%lu", &(t->tv_usec));
@@ -120,13 +120,12 @@ int oneshot_insert(char *words[]){
     
     //Increment the id for the next events
     globid++;
-    return status;  
+    return eve->id;  
 }
 
-int repeat_insert(char *words[]){
+unsigned long repeat_insert(char *words[]){
     Event *eve = (Event *)malloc(sizeof(Event));
     struct timeval *t = (struct timeval *)malloc(sizeof(struct timeval));
-    int status = 1;
 
     /* Convert msec to sec and usec */
     long secs = 0;
@@ -163,20 +162,21 @@ int repeat_insert(char *words[]){
     
     //Increment the id for the next events
     globid++; 
-    return status; 
+    return eve->id; 
 }
 
-int update_cancel(char *words[]){
-    //TODO: Cancel a previous request
-    //svid = w[1]
-    //get from map
-    //cancel and resp = svid
-    //return resp
-    int status = 1;
+unsigned long update_cancel(char *words[]){
     Event *eve_ptr;
-    map->get(map, (void *)&globid, (void *)&eve_ptr);
+    //TODO: Cancel a previous request
+    unsigned long svid = 0;
+    //svid = w[1]
+    scanf(words[1], "%lu", svid);
+    //get from map
+    map->get(map, (void *)&svid, (void *)&eve_ptr);
+    //cancel and resp = svid
     eve_ptr->cancelled = 0;
-    return status;
+    //return resp
+    return svid;
 }
 
 void *receive(){
@@ -190,6 +190,7 @@ void *receive(){
     unsigned short port;
     char *w[25];
     int N;
+    unsigned long svid;
 
     service = SERVICE;
     port = PORT;
@@ -206,30 +207,33 @@ void *receive(){
         free(resp);
         exit(EXIT_FAILURE);
     }
+    printf("outwhile");
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
         query[len] = '\0';
         N = extractWords(query, "|", w);
-        if(strcmp(w[0], "OneShot") == 0 && N == 7){
-                //id = oneshot_insert(w);
-                //sprintf(resp, "1%s", query);
+        printf("outif");
+        if((strcmp(w[0], "OneShot") == 0) && (N == 7)){
+                svid = oneshot_insert(w);
+                printf("inside oneshot");
                 sprintf(resp, "1%08lu", svid);
         }
         else if(strcmp(w[0], "Repeat") == 0 && N == 7){
-                repeat_insert(w);
-                sprintf(resp, "1%s", query);
+                svid = repeat_insert(w);
+                sprintf(resp, "1%08lu", svid);
         }
         else if(strcmp(w[0], "Cancel") == 0 && N == 2){
-                update_cancel();
-                sprintf(resp, "1%s", query);
+                svid = update_cancel(w);
+                sprintf(resp, "%08lu", svid);
         }
         else{
-            //id = 0
-            sprintf(resp, "0%s", query);
+            svid = 0;
+            sprintf(resp, "0%s", query);  
         }
-        //if id != 0
-        //sprintf(Resp)
-        //selse
+        
+        //if (id != 0)
+          //  sprintf(resp, "0%s", query);
+        //else
         //sprintf resp 0
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
@@ -281,7 +285,9 @@ void *timer(UNUSED void *args) {
                 //If not recycle the heap storage
                 else{
                     //remove from the map
+                    map->remove(map, (void *)&eve_ptr->id);
                     //free heap
+
                 }
             }
             //If the event is not cancelled, fire it
@@ -291,6 +297,7 @@ void *timer(UNUSED void *args) {
             //If it is cancelled, recycle the heap storage
             else{
                 //remove from the map
+                map->remove(map, (void *)&eve_ptr->id);
                 //free heap
             }
         }
