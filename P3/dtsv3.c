@@ -67,6 +67,10 @@ int compare(void *p1, void *p2){
 
 }
 
+int compare_map(){
+
+}
+
 int extractWords(char *buf, char *sep, char *words[]) {
     int i;
     char *p;
@@ -79,12 +83,13 @@ int extractWords(char *buf, char *sep, char *words[]) {
 
 int main(UNUSED int argc, UNUSED char *argv[]) {
     q = HeapPrioQueue(compare, doNothing, doNothing);
-    map = HashMap(100, 0.f, hash, compare, NULL, NULL);
+    map = HashMap(100, 5.0, hash, compare, NULL, NULL);
     
     pthread_t receiver_t, timer_t;
     pthread_mutex_init(&lock, NULL);
-    pthread_create(&receiver_t, NULL, receive, NULL);
+    
     pthread_create(&timer_t, NULL, timer, NULL);
+    pthread_create(&receiver_t, NULL, receive, NULL);
     
     pthread_join(receiver_t, NULL);
     pthread_join(timer_t, NULL);
@@ -207,38 +212,38 @@ void *receive(){
         free(resp);
         exit(EXIT_FAILURE);
     }
-    printf("outwhile");
+    printf("outwhile\n");
+    printf("%d", BUFSIZ);
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
+        char cmd[1000];
         query[len] = '\0';
-        N = extractWords(query, "|", w);
-        printf("outif");
-        if((strcmp(w[0], "OneShot") == 0) && (N == 7)){
+        strcpy(cmd, query);
+        N = extractWords(cmd, "|", w);
+        printf("outif\n");
+        if((strcmp(w[0], "OneShot") == 0) && N == 7){
                 svid = oneshot_insert(w);
-                printf("inside oneshot");
+                printf("inside oneshot\n");
                 sprintf(resp, "1%08lu", svid);
         }
-        else if(strcmp(w[0], "Repeat") == 0 && N == 7){
+        else if((strcmp(w[0], "Repeat") == 0) && N == 7){
+                printf("inside repat\n");
                 svid = repeat_insert(w);
                 sprintf(resp, "1%08lu", svid);
         }
-        else if(strcmp(w[0], "Cancel") == 0 && N == 2){
+        else if((strcmp(w[0], "Cancel") == 0) && N == 2){
+                printf("inside cancel\n");
                 svid = update_cancel(w);
                 sprintf(resp, "%08lu", svid);
         }
         else{
-            svid = 0;
-            sprintf(resp, "0%s", query);  
+            //svid = 0;
+            sprintf(resp, "0%s", cmd);  
         }
-        
-        //if (id != 0)
-          //  sprintf(resp, "0%s", query);
-        //else
-        //sprintf resp 0
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
     free(query);
-    //resp
+    free(resp);
     pthread_exit(NULL);
 }
 
