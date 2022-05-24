@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <valgrind/valgrind.h>
 #include "BXP/bxp.h"
 #include "ADTs/heapprioqueue.h"
 #include "ADTs/queue.h"
@@ -20,7 +21,7 @@
 const PrioQueue *q = NULL;
 const Map *map = NULL;
 
-int globid = 0;
+int globid = 1;
 
 pthread_mutex_t lock;
 
@@ -67,10 +68,12 @@ int compare(void *p1, void *p2){
 
 }
 
-int compare_map(unsigned long id1, unsigned long id2){
-    if(id1>id2)
+int compare_map(void *id1, void *id2){
+    unsigned long *s1 = (unsigned long *)id1;
+    unsigned long *s2 = (unsigned long *)id2;
+    if(s1>s2)
         return 1;
-    else if (id2>id1)
+    else if (s2>s1)
         return -1;
     else 
         return 0;
@@ -92,7 +95,7 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
     if(q == NULL) {
         fprintf(stderr, "ERROR: Piority Queue creation failed.\n");
     }
-    map = HashMap(100, 5.0, hash, compare, NULL, NULL);
+    map = HashMap(100, 5.0, hash, compare_map, NULL, NULL);
     if(map == NULL) {
         fprintf(stderr, "ERROR: HashMap creation failed.\n");
     }
@@ -125,7 +128,7 @@ unsigned long oneshot_insert(char *words[]){
     eve->id = globid;
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
-    sscanf(words[4], "%s", eve->host);
+    //printf("(OS)W[4]: %s\n", words[4]);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -167,7 +170,7 @@ unsigned long repeat_insert(char *words[]){
     eve->id = globid;
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
-    sscanf(words[4], "%s", eve->host);
+    //printf("(Repeat)W[4]: %s\n", words[4]);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -189,7 +192,7 @@ unsigned long update_cancel(char *words[]){
     //svid = w[1]
     sscanf(words[1], "%lu", &(svid));
     //get from map
-    map->get(map, (void *)&svid, (void *)&eve_ptr);
+    map->get(map, (void *)svid, (void **)&eve_ptr);
     //cancel and resp = svid
     eve_ptr->cancelled = 0;
     //return resp
@@ -232,25 +235,32 @@ void *receive(){
         N = extractWords(cmd, "|", w);
         printf("outif\n");
         if((strcmp(w[0], "OneShot") == 0) && N == 7){
-                printf("inside oneshot\n");
+                //printf("inside oneshot\n");
                 svid = oneshot_insert(w);
-                printf("inside oneshot\n");
-                sprintf(resp, "1%08lu", svid);
+                printf("OS:%lu\n", svid);
+                VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
         else if((strcmp(w[0], "Repeat") == 0) && N == 7){
                 printf("inside repat\n");
                 svid = repeat_insert(w);
-                sprintf(resp, "1%08lu", svid);
+                printf("Repeat:%lu\n", svid);
+                VALGRIND_MONITOR_COMMAND("leak_check summary");
+                
         }
         else if((strcmp(w[0], "Cancel") == 0) && N == 2){
                 printf("inside cancel\n");
                 svid = update_cancel(w);
-                sprintf(resp, "%08lu", svid);
+                printf("Cancel:%lu\n", svid);
+                VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
         else{
-            //svid = 0;
-            sprintf(resp, "0%s", cmd);  
+            svid = 0;  
         }
+        if(svid == 0)
+            strcpy(resp, "0");
+        else
+            sprintf(resp, "1%08lu", svid);
+        
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
     free(query);
@@ -260,25 +270,28 @@ void *receive(){
 
 void *timer(UNUSED void *args) {
     struct timeval now;
-    struct timeval *tval_ptr;
+    
     
     
     for(;;) {
+        
+        usleep(USECS);
+        gettimeofday(&now, NULL);
+
         //Queue to store ready to harvest events
         const Queue *queue = Queue_create(NULL);
         //Queue to store the repeat events
         const Queue *r_queue = Queue_create(NULL);
-        
+
+        struct timeval *tval_ptr;
         Event *eve_ptr;
-        usleep(USECS);
-        gettimeofday(&now, NULL);
 
         /* Get the events that are ready to harvest,
            Then add to queue */
         pthread_mutex_lock(&lock);
         while(q->min(q, (void **)&tval_ptr, (void **)&eve_ptr)){
             //If now > tval_ptr, returns 1
-            if(compare((void *)&now, (void *)&tval_ptr) == 1){
+            if(compare((void *)tval_ptr, (void *)&now) <= 0){
                 //Remove the minimum event from the priority queue
                 q->removeMin(q, (void **)&tval_ptr, (void **)&eve_ptr);
                 //Add to queue
@@ -325,7 +338,9 @@ void *timer(UNUSED void *args) {
         while(r_queue->dequeue(r_queue, (void **)&eve_ptr)){
             struct timeval *new_now;
             new_now = (struct timeval *)malloc(sizeof(struct timeval));
-            q->insert(q, new_now, (void *)eve_ptr);
+            gettimeofday(new_now, NULL);
+
+            q->insert(q, (void *)new_now, (void *)eve_ptr);
         }
         pthread_mutex_unlock(&lock);
     }
