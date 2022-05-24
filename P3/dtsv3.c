@@ -71,13 +71,16 @@ int compare(void *p1, void *p2){
 int compare_map(void *id1, void *id2){
     unsigned long *s1 = (unsigned long *)id1;
     unsigned long *s2 = (unsigned long *)id2;
+    int c;
+    
     if(s1>s2)
-        return 1;
+        c = 1;
     else if (s2>s1)
-        return -1;
+        c = -1;
     else 
-        return 0;
+        c = 0;
 
+    return c;
 }
 
 int extractWords(char *buf, char *sep, char *words[]) {
@@ -121,14 +124,13 @@ unsigned long oneshot_insert(char *words[]){
     sscanf(words[3], "%ld", &(t->tv_usec));
     
     //Initialize event
+    eve->id = globid;
     eve->oneshot = 1;
     eve->repeat = 0;
     eve->cancelled = 0;
     eve->numRepeats = 0;
-    eve->id = globid;
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
-    //printf("(OS)W[4]: %s\n", words[4]);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -140,6 +142,7 @@ unsigned long oneshot_insert(char *words[]){
     
     //Increment the id for the next events
     globid++;
+
     return eve->id;  
 }
 
@@ -163,14 +166,13 @@ unsigned long repeat_insert(char *words[]){
     t->tv_usec = usecs;
     
     //Initialize event struct
+    eve->id = globid;
     eve->oneshot = 0;
     eve->repeat = 1;
     eve->cancelled = 0;
     sscanf(words[3], "%lu", &(eve->numRepeats));
-    eve->id = globid;
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
-    //printf("(Repeat)W[4]: %s\n", words[4]);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -181,21 +183,21 @@ unsigned long repeat_insert(char *words[]){
     map->putUnique(map, (void *)&globid, (void *)eve);
     
     //Increment the id for the next events
-    globid++; 
+    globid++;
+
     return eve->id; 
 }
 
 unsigned long update_cancel(char *words[]){
     Event *eve_ptr;
-    //TODO: Cancel a previous request
     unsigned long svid = 0;
-    //svid = w[1]
+    //Get the id of the event that needs to cancelled
     sscanf(words[1], "%lu", &(svid));
-    //get from map
+    //Get the event from the map
     map->get(map, (void *)svid, (void **)&eve_ptr);
-    //cancel and resp = svid
-    eve_ptr->cancelled = 0;
-    //return resp
+    //Set the cancel to 1
+    eve_ptr->cancelled = 1;
+    //Return the id
     return svid;
 }
 
@@ -233,29 +235,22 @@ void *receive(){
         query[len] = '\0';
         strcpy(cmd, query);
         N = extractWords(cmd, "|", w);
-        printf("outif\n");
         if((strcmp(w[0], "OneShot") == 0) && N == 7){
-                //printf("inside oneshot\n");
                 svid = oneshot_insert(w);
-                printf("OS:%lu\n", svid);
                 VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
         else if((strcmp(w[0], "Repeat") == 0) && N == 7){
-                printf("inside repat\n");
                 svid = repeat_insert(w);
-                printf("Repeat:%lu\n", svid);
                 VALGRIND_MONITOR_COMMAND("leak_check summary");
-                
         }
         else if((strcmp(w[0], "Cancel") == 0) && N == 2){
-                printf("inside cancel\n");
                 svid = update_cancel(w);
-                printf("Cancel:%lu\n", svid);
                 VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
         else{
             svid = 0;  
         }
+
         if(svid == 0)
             strcpy(resp, "0");
         else
@@ -290,7 +285,7 @@ void *timer(UNUSED void *args) {
            Then add to queue */
         pthread_mutex_lock(&lock);
         while(q->min(q, (void **)&tval_ptr, (void **)&eve_ptr)){
-            //If now > tval_ptr, returns 1
+            //If now >= tval_ptr
             if(compare((void *)tval_ptr, (void *)&now) <= 0){
                 //Remove the minimum event from the priority queue
                 q->removeMin(q, (void **)&tval_ptr, (void **)&eve_ptr);
@@ -301,8 +296,9 @@ void *timer(UNUSED void *args) {
                 break;
         }
         pthread_mutex_unlock(&lock);
-        pthread_mutex_lock(&lock);
+        
         /* Process the events that are in the queue */
+        pthread_mutex_lock(&lock);
         while(queue->dequeue(queue, (void **)&eve_ptr)){
             //If it is a repeat query, fire it
             if((eve_ptr->repeat == 1) && (eve_ptr->numRepeats > 0)){
@@ -316,6 +312,7 @@ void *timer(UNUSED void *args) {
                     //remove from the map
                     map->remove(map, (void *)&eve_ptr->id);
                     //free heap
+                    free(eve_ptr);
 
                 }
             }
@@ -344,5 +341,6 @@ void *timer(UNUSED void *args) {
         }
         pthread_mutex_unlock(&lock);
     }
+
     pthread_exit(NULL);
 }
