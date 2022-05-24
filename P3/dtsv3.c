@@ -67,7 +67,13 @@ int compare(void *p1, void *p2){
 
 }
 
-int compare_map(){
+int compare_map(unsigned long id1, unsigned long id2){
+    if(id1>id2)
+        return 1;
+    else if (id2>id1)
+        return -1;
+    else 
+        return 0;
 
 }
 
@@ -82,8 +88,14 @@ int extractWords(char *buf, char *sep, char *words[]) {
 }
 
 int main(UNUSED int argc, UNUSED char *argv[]) {
-    q = HeapPrioQueue(compare, doNothing, doNothing);
+    q = HeapPrioQueue(compare, NULL, NULL);
+    if(q == NULL) {
+        fprintf(stderr, "ERROR: Piority Queue creation failed.\n");
+    }
     map = HashMap(100, 5.0, hash, compare, NULL, NULL);
+    if(map == NULL) {
+        fprintf(stderr, "ERROR: HashMap creation failed.\n");
+    }
     
     pthread_t receiver_t, timer_t;
     pthread_mutex_init(&lock, NULL);
@@ -102,8 +114,8 @@ unsigned long oneshot_insert(char *words[]){
     struct timeval *t = (struct timeval *)malloc(sizeof(struct timeval)); 
 
     //Initialize timeval
-    scanf(words[2], "%lu", &(t->tv_sec));
-    scanf(words[3], "%lu", &(t->tv_usec));
+    sscanf(words[2], "%ld", &(t->tv_sec));
+    sscanf(words[3], "%ld", &(t->tv_usec));
     
     //Initialize event
     eve->oneshot = 1;
@@ -111,9 +123,9 @@ unsigned long oneshot_insert(char *words[]){
     eve->cancelled = 0;
     eve->numRepeats = 0;
     eve->id = globid;
-    scanf(words[1], "%lu", &(eve->clid));
-    scanf(words[6], "%u", &(eve->port));
-    scanf(words[4], "%lu", &(eve->host));
+    sscanf(words[1], "%lu", &(eve->clid));
+    sscanf(words[6], "%u", &(eve->port));
+    sscanf(words[4], "%s", eve->host);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -136,7 +148,7 @@ unsigned long repeat_insert(char *words[]){
     long secs = 0;
     long msecs = 0;
     long usecs = 0;
-    scanf(words[2], "%ld", &msecs);
+    sscanf(words[2], "%ld", &msecs);
     usecs = msecs * 1000;
     while(usecs > 1000000){
         usecs = usecs - 1000000;
@@ -151,11 +163,11 @@ unsigned long repeat_insert(char *words[]){
     eve->oneshot = 0;
     eve->repeat = 1;
     eve->cancelled = 0;
-    scanf(words[3], "%lu", &(eve->numRepeats));
+    sscanf(words[3], "%lu", &(eve->numRepeats));
     eve->id = globid;
-    scanf(words[1], "%lu", &(eve->clid));
-    scanf(words[6], "%u", &(eve->port));
-    scanf(words[4], "%lu", &(eve->host));
+    sscanf(words[1], "%lu", &(eve->clid));
+    sscanf(words[6], "%u", &(eve->port));
+    sscanf(words[4], "%s", eve->host);
     eve->host = strdup(words[4]); 
     eve->service = strdup(words[5]);
     
@@ -175,7 +187,7 @@ unsigned long update_cancel(char *words[]){
     //TODO: Cancel a previous request
     unsigned long svid = 0;
     //svid = w[1]
-    scanf(words[1], "%lu", svid);
+    sscanf(words[1], "%lu", &(svid));
     //get from map
     map->get(map, (void *)&svid, (void *)&eve_ptr);
     //cancel and resp = svid
@@ -212,8 +224,6 @@ void *receive(){
         free(resp);
         exit(EXIT_FAILURE);
     }
-    printf("outwhile\n");
-    printf("%d", BUFSIZ);
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
         char cmd[1000];
@@ -222,6 +232,7 @@ void *receive(){
         N = extractWords(cmd, "|", w);
         printf("outif\n");
         if((strcmp(w[0], "OneShot") == 0) && N == 7){
+                printf("inside oneshot\n");
                 svid = oneshot_insert(w);
                 printf("inside oneshot\n");
                 sprintf(resp, "1%08lu", svid);
