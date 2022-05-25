@@ -52,6 +52,7 @@ int compare(void *p1, void *p2){
     struct timeval *s1 = (struct timeval *)p1;
     struct timeval *s2 = (struct timeval *)p2;
     int c;
+    //TODO: GETTING UNINITIALIZED HERE
     if((s1->tv_sec) < (s2->tv_sec))
         c = -1;
     else if((s1->tv_sec) > (s2->tv_sec))
@@ -111,6 +112,9 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
     
     pthread_join(receiver_t, NULL);
     pthread_join(timer_t, NULL);
+
+    q->destroy(q);
+    map->destroy(map);
 
     return 0;
 }
@@ -196,6 +200,7 @@ unsigned long update_cancel(char *words[]){
     //Get the event from the map
     map->get(map, (void *)svid, (void **)&eve_ptr);
     //Set the cancel to 1
+    //TODO: GETTING UNINITIALIZED HERE
     eve_ptr->cancelled = 1;
     //Return the id
     return svid;
@@ -266,8 +271,6 @@ void *receive(){
 void *timer(UNUSED void *args) {
     struct timeval now;
     
-    
-    
     for(;;) {
         
         usleep(USECS);
@@ -297,6 +300,7 @@ void *timer(UNUSED void *args) {
         }
         pthread_mutex_unlock(&lock);
         
+        //TODO: REPEAT FIRING REPEATEDLY
         /* Process the events that are in the queue */
         pthread_mutex_lock(&lock);
         while(queue->dequeue(queue, (void **)&eve_ptr)){
@@ -325,6 +329,7 @@ void *timer(UNUSED void *args) {
                 //remove from the map
                 map->remove(map, (void *)&eve_ptr->id);
                 //free heap
+                free(eve_ptr);
             }
         }
         pthread_mutex_unlock(&lock);
@@ -335,12 +340,15 @@ void *timer(UNUSED void *args) {
         while(r_queue->dequeue(r_queue, (void **)&eve_ptr)){
             struct timeval *new_now;
             new_now = (struct timeval *)malloc(sizeof(struct timeval));
-            gettimeofday(new_now, NULL);
-
+            gettimeofday(new_now, NULL);\
             q->insert(q, (void *)new_now, (void *)eve_ptr);
+
+            free(new_now);
         }
         pthread_mutex_unlock(&lock);
-    }
 
+        queue->destroy(queue);
+        r_queue->destroy(r_queue);
+    }
     pthread_exit(NULL);
 }
