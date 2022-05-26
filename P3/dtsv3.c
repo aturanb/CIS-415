@@ -202,8 +202,10 @@ unsigned long update_cancel(char *words[]){
     //Get the id of the event that needs to cancelled
     sscanf(words[1], "%lu", &(svid));
     //Get the event from the map
-    if(map->get(map, (void *)svid, (void **)&eve_ptr))
+    if(map->get(map, (void *)svid, (void **)&eve_ptr)){
+        printf("Cancelling\n");
         eve_ptr->cancelled = 1;
+    }
     //Return the id
     return svid;
 }
@@ -299,6 +301,7 @@ void *timer(UNUSED void *args) {
                 q->removeMin(q, (void **)&tval_ptr, (void **)&eve_ptr);
                 //Add to queue
                 queue->enqueue(queue, eve_ptr);
+                //TODO: GIVES ERROR WHEN REPEAT CALLED: free(tval_ptr);
             }
             else
                 break;
@@ -308,18 +311,29 @@ void *timer(UNUSED void *args) {
         /* Process the events that are in the queue */
         while(queue->dequeue(queue, (void **)&eve_ptr)){
             //If the event is not cancelled, fire it
+
             if(eve_ptr->cancelled == 0){
+                printf("Event fired: %lu|%s|%s|%u\n", eve_ptr->clid, eve_ptr->host, eve_ptr->service, eve_ptr->port);
                 if(eve_ptr->repeat == 1 && eve_ptr->numRepeats > 1){
                     eve_ptr->numRepeats--;
                     r_queue->enqueue(r_queue, (void *)eve_ptr);
-
                 }
-                printf("Event fired: %lu|%s|%s|%u\n", eve_ptr->clid, eve_ptr->host, eve_ptr->service, eve_ptr->port);
+                else{
+                    map->remove(map, (void *)eve_ptr->id);
+                    //free(tval_ptr);
+                    //free(eve_ptr->host);
+                    //free(eve_ptr->service);
+                    //free(eve_ptr);
+                }            
+                
             }
             //If it is cancelled, recycle the heap storage
             else{
                 map->remove(map, (void *)eve_ptr->id);
-                free(eve_ptr);
+                //free(tval_ptr);
+                //free(eve_ptr->host);
+                //free(eve_ptr->service);
+                //free(eve_ptr);
             }
         }
 
@@ -338,10 +352,9 @@ void *timer(UNUSED void *args) {
             q->insert(q, (void *)later, (void *)eve_ptr);
         }
         pthread_mutex_unlock(&lock);
-
         queue->destroy(queue);
         r_queue->destroy(r_queue);
     }
-    free(later);
+    //free(later);
     pthread_exit(NULL);
 }

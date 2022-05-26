@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <pthread.h>
+#include <valgrind/valgrind.h>
 #define UNUSED __attribute__((unused))
 
 #define PORT 19999
@@ -48,8 +49,13 @@ void *recieve(){
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
         query[len] = '\0';
-        sprintf(resp, "1%s", query);
+        char cmd[1000];
+        strcpy(cmd, query);
+        sprintf(resp, "1%s", cmd);
+        //VALGRIND_MONITOR_COMMAND("leak_check summary");
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
+    free(query);
+    free(resp);
     pthread_exit(NULL);
 }

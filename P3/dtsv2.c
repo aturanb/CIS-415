@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <pthread.h>
+#include <valgrind/valgrind.h>
 #define UNUSED __attribute__((unused))
 
 #define PORT 19999
@@ -60,23 +61,27 @@ void *recieve(){
     //obtain the next query message from `bxps' - blocks until message available
     while ((len = bxp_query(bxps, &sender, query, BUFSIZ)) > 0) {
         query[len] = '\0';
-        N = extractWords(query, "|", w);
-        if(strcmp(w[0], "OneShot") == 0){
-            if(N == 7)
+        char cmd[1000];
+        strcpy(cmd, query);
+        N = extractWords(cmd, "|", w);
+        if((strcmp(w[0], "OneShot") == 0) && (N == 7)){
                 sprintf(resp, "1%s", query);
+                //VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
-        else if(strcmp(w[0], "Repeat") == 0){
-            if(N == 7)
+        else if((strcmp(w[0], "Repeat") == 0) && (N == 7)){
                 sprintf(resp, "1%s", query);
+                //VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
-        else if(strcmp(w[0], "Cancel") == 0){
-            if(N == 2)
+        else if((strcmp(w[0], "Cancel") == 0) && (N == 2)){
                 sprintf(resp, "1%s", query);
+                //VALGRIND_MONITOR_COMMAND("leak_check summary");
         }
         else{
             sprintf(resp, "0%s", query);
         }
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
+    free(query);
+    free(resp);
     pthread_exit(NULL);
 }
