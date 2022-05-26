@@ -52,7 +52,9 @@ int compare(void *p1, void *p2){
     struct timeval *s1 = (struct timeval *)p1;
     struct timeval *s2 = (struct timeval *)p2;
     int c;
-    //TODO: GETTING UNINITIALIZED HERE
+    //TODO: GETTING INVALID SIZE
+    //printf("%ld\n", (unsigned long) s1->tv_sec);
+    //printf("%ld\n", (unsigned long) s2->tv_sec);
     if((s1->tv_sec) < (s2->tv_sec))
         c = -1;
     else if((s1->tv_sec) > (s2->tv_sec))
@@ -133,6 +135,7 @@ unsigned long oneshot_insert(char *words[]){
     eve->repeat = 0;
     eve->cancelled = 0;
     eve->numRepeats = 0;
+    eve->interval = 0;
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
     eve->host = strdup(words[4]); 
@@ -175,6 +178,7 @@ unsigned long repeat_insert(char *words[]){
     eve->repeat = 1;
     eve->cancelled = 0;
     sscanf(words[3], "%lu", &(eve->numRepeats));
+    sscanf(words[2], "%lu", &(eve->interval));
     sscanf(words[1], "%lu", &(eve->clid));
     sscanf(words[6], "%u", &(eve->port));
     eve->host = strdup(words[4]); 
@@ -198,10 +202,8 @@ unsigned long update_cancel(char *words[]){
     //Get the id of the event that needs to cancelled
     sscanf(words[1], "%lu", &(svid));
     //Get the event from the map
-    map->get(map, (void *)svid, (void **)&eve_ptr);
-    //Set the cancel to 1
-    //TODO: GETTING UNINITIALIZED HERE
-    eve_ptr->cancelled = 1;
+    if(map->get(map, (void *)svid, (void **)&eve_ptr))
+        eve_ptr->cancelled = 1;
     //Return the id
     return svid;
 }
@@ -265,11 +267,13 @@ void *receive(){
     }
     free(query);
     free(resp);
+
     pthread_exit(NULL);
 }
 
 void *timer(UNUSED void *args) {
     struct timeval now;
+    struct timeval *later = (struct timeval *)malloc(sizeof(struct timeval));
     
     for(;;) {
         
@@ -282,6 +286,7 @@ void *timer(UNUSED void *args) {
         const Queue *r_queue = Queue_create(NULL);
 
         struct timeval *tval_ptr;
+
         Event *eve_ptr;
 
         /* Get the events that are ready to harvest,
@@ -300,55 +305,43 @@ void *timer(UNUSED void *args) {
         }
         pthread_mutex_unlock(&lock);
         
-        //TODO: REPEAT FIRING REPEATEDLY
         /* Process the events that are in the queue */
-        pthread_mutex_lock(&lock);
         while(queue->dequeue(queue, (void **)&eve_ptr)){
-            //If it is a repeat query, fire it
-            if((eve_ptr->repeat == 1) && (eve_ptr->numRepeats > 0)){
-                printf("Event fired: %lu|%s|%s|%u\n", eve_ptr->clid, eve_ptr->host, eve_ptr->service, eve_ptr->port);
-                eve_ptr->numRepeats--;
-                //If it still have repeats left add to r_queue
-                if(eve_ptr->numRepeats > 0)
-                    r_queue->enqueue(r_queue, eve_ptr);
-                //If not recycle the heap storage
-                else{
-                    //remove from the map
-                    map->remove(map, (void *)&eve_ptr->id);
-                    //free heap
-                    free(eve_ptr);
+            //If the event is not cancelled, fire it
+            if(eve_ptr->cancelled == 0){
+                if(eve_ptr->repeat == 1 && eve_ptr->numRepeats > 1){
+                    eve_ptr->numRepeats--;
+                    r_queue->enqueue(r_queue, (void *)eve_ptr);
 
                 }
-            }
-            //If the event is not cancelled, fire it
-            else if(eve_ptr->cancelled == 0){
                 printf("Event fired: %lu|%s|%s|%u\n", eve_ptr->clid, eve_ptr->host, eve_ptr->service, eve_ptr->port);
             }
             //If it is cancelled, recycle the heap storage
             else{
-                //remove from the map
-                map->remove(map, (void *)&eve_ptr->id);
-                //free heap
+                map->remove(map, (void *)eve_ptr->id);
                 free(eve_ptr);
             }
         }
-        pthread_mutex_unlock(&lock);
 
         /* Go through r_queue and insert the repeat events
            to the priority queue with a new priority */
         pthread_mutex_lock(&lock);
         while(r_queue->dequeue(r_queue, (void **)&eve_ptr)){
-            struct timeval *new_now;
-            new_now = (struct timeval *)malloc(sizeof(struct timeval));
-            gettimeofday(new_now, NULL);\
-            q->insert(q, (void *)new_now, (void *)eve_ptr);
-
-            free(new_now);
+            //later = now + interval
+            later->tv_sec = now.tv_sec;
+            later->tv_usec = now.tv_usec + eve_ptr->interval*1000;
+            while(later->tv_usec > 1000000){
+                later->tv_usec = later->tv_usec - 1000000;
+                later->tv_sec++;
+            }
+            //Insert back into the pq with later as a priority
+            q->insert(q, (void *)later, (void *)eve_ptr);
         }
         pthread_mutex_unlock(&lock);
 
         queue->destroy(queue);
         r_queue->destroy(r_queue);
     }
+    free(later);
     pthread_exit(NULL);
 }
