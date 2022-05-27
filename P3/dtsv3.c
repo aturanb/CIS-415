@@ -21,7 +21,7 @@
 const PrioQueue *q = NULL;
 const Map *map = NULL;
 
-int globid = 1;
+unsigned long globid = 1;
 
 pthread_mutex_t lock;
 
@@ -52,9 +52,6 @@ int compare(void *p1, void *p2){
     struct timeval *s1 = (struct timeval *)p1;
     struct timeval *s2 = (struct timeval *)p2;
     int c;
-    //TODO: GETTING INVALID SIZE
-    //printf("%ld\n", (unsigned long) s1->tv_sec);
-    //printf("%ld\n", (unsigned long) s2->tv_sec);
     if((s1->tv_sec) < (s2->tv_sec))
         c = -1;
     else if((s1->tv_sec) > (s2->tv_sec))
@@ -101,7 +98,7 @@ int main(UNUSED int argc, UNUSED char *argv[]) {
     if(q == NULL) {
         fprintf(stderr, "ERROR: Piority Queue creation failed.\n");
     }
-    map = HashMap(100, 5.0, hash, compare_map, NULL, NULL);
+    map = HashMap(128, 4.0, hash, compare_map, NULL, NULL);
     if(map == NULL) {
         fprintf(stderr, "ERROR: HashMap creation failed.\n");
     }
@@ -145,7 +142,7 @@ unsigned long oneshot_insert(char *words[]){
     q->insert(q, t, (void *)eve);
     
     //Insert map where key is id
-    map->putUnique(map, (void *)&globid, (void *)eve);
+    map->putUnique(map, (void *)globid, (void *)eve);
     
     //Increment the id for the next events
     globid++;
@@ -188,7 +185,7 @@ unsigned long repeat_insert(char *words[]){
     q->insert(q, t, (void *)eve);
     
     //Insert map where key is id
-    map->putUnique(map, (void *)&globid, (void *)eve);
+    map->putUnique(map, (void *)globid, (void *)eve);
     
     //Increment the id for the next events
     globid++;
@@ -198,16 +195,18 @@ unsigned long repeat_insert(char *words[]){
 
 unsigned long update_cancel(char *words[]){
     Event *eve_ptr;
-    unsigned long svid = 0;
+    unsigned long curr_id = 0;
+    unsigned long ret_id = 0;
     //Get the id of the event that needs to cancelled
-    sscanf(words[1], "%lu", &(svid));
+    sscanf(words[1], "%lu", &(curr_id));
     //Get the event from the map
-    if(map->get(map, (void *)svid, (void **)&eve_ptr)){
-        printf("Cancelling\n");
+    if(map->get(map, (void *)curr_id, (void **)&eve_ptr)){
         eve_ptr->cancelled = 1;
     }
-    //Return the id
-    return svid;
+    ret_id = globid;
+    globid++;
+
+    return ret_id;
 }
 
 void *receive(){
@@ -301,7 +300,8 @@ void *timer(UNUSED void *args) {
                 q->removeMin(q, (void **)&tval_ptr, (void **)&eve_ptr);
                 //Add to queue
                 queue->enqueue(queue, eve_ptr);
-                //TODO: GIVES ERROR WHEN REPEAT CALLED: free(tval_ptr);
+                //TODO: GIVES ERROR WHEN REPEAT CALLED: 
+                //free(tval_ptr);
             }
             else
                 break;
@@ -319,7 +319,7 @@ void *timer(UNUSED void *args) {
                     r_queue->enqueue(r_queue, (void *)eve_ptr);
                 }
                 else{
-                    map->remove(map, (void *)eve_ptr->id);
+                    map->remove(map, (void *)&eve_ptr->id);
                     //free(tval_ptr);
                     //free(eve_ptr->host);
                     //free(eve_ptr->service);
@@ -329,7 +329,7 @@ void *timer(UNUSED void *args) {
             }
             //If it is cancelled, recycle the heap storage
             else{
-                map->remove(map, (void *)eve_ptr->id);
+                map->remove(map, (void *)&eve_ptr->id);
                 //free(tval_ptr);
                 //free(eve_ptr->host);
                 //free(eve_ptr->service);
@@ -349,12 +349,13 @@ void *timer(UNUSED void *args) {
                 later->tv_sec++;
             }
             //Insert back into the pq with later as a priority
-            q->insert(q, (void *)later, (void *)eve_ptr);
+            if(eve_ptr->cancelled == 0)
+                q->insert(q, (void *)later, (void *)eve_ptr);
         }
         pthread_mutex_unlock(&lock);
         queue->destroy(queue);
         r_queue->destroy(r_queue);
     }
-    //free(later);
+    free(later);
     pthread_exit(NULL);
 }

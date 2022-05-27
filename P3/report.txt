@@ -1,0 +1,20 @@
+Name: Ahmet Turan Bulut
+DuckID: turanb
+Assistance: Nick's and Timmy's help hours
+
+State of the solution: 
+DTSV1:
+Works as expected
+
+DTSV2:
+Works as expected
+
+DTSV3:
+Works as expected
+There is a small amount of memory leak that I could not free.
+I added free() to possible locations but the more I free, the more 
+my code started to get glitchy, such as working fine until the second repeat call.
+
+DTSV4:
+Did not do it.
+

@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <pthread.h>
-#include <valgrind/valgrind.h>
 #define UNUSED __attribute__((unused))
 
 #define PORT 19999
@@ -52,7 +51,6 @@ void *recieve(){
         char cmd[1000];
         strcpy(cmd, query);
         sprintf(resp, "1%s", cmd);
-        //VALGRIND_MONITOR_COMMAND("leak_check summary");
         bxp_response(bxps, &sender, resp, strlen(resp) + 1);
     }
     free(query);
